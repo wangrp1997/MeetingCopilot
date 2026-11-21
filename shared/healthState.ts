@@ -102,6 +102,9 @@ function deriveLlm(settings: PublicSettings): ServiceHealth {
     slot: 'llm',
     verification: settings.llm.verification,
   };
+  if (settings.codex?.enabled) {
+    return { ...base, state: 'ok', slot: undefined, local: true, verification: undefined };
+  }
   if (!settings.llm.apiKeySet || !settings.llm.baseUrl || !settings.llm.model) {
     return { ...base, state: 'unconfigured' };
   }

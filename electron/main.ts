@@ -49,9 +49,11 @@ import { KnowledgeStore } from './knowledge';
 import { SessionStore } from './sessions';
 import { DOC_EXTENSIONS, extractDocText } from './docparse';
 import { chatOnce, chatStream, type ChatResult } from './llm/adapter';
+import { CodexMeetingBridge } from './llm/codexBridge';
 import { visionChat } from './llm/vision';
 import {
   buildAnswerMessages,
+  buildCodexMeetingPrompt,
   buildMemoUpdateMessages,
   buildPrewarmMessages,
   buildStablePrefix,
@@ -136,6 +138,7 @@ function bootstrap(): void {
   let capturing = false;
   const asr = new AsrHost();
   const rag = new RagHost();
+  const codexBridge = new CodexMeetingBridge();
   const sidecar = new FunasrSidecar();
   const tray = new AppTray();
 
@@ -714,7 +717,9 @@ function bootstrap(): void {
 
     async function doPrewarm(prefix: string, reason: string): Promise<void> {
       const apiKey = settings.getLlmApiKey();
-      if (!apiKey || settings.data.llm.answerWithVision) return; // vision path ≠ DeepSeek
+      if (!apiKey || settings.data.llm.answerWithVision || settings.data.codex?.enabled) {
+        return; // vision / Codex paths do not use the DeepSeek prefix cache
+      }
       lastPrefix = prefix;
       lastPrefixActivity = Date.now();
       try {
@@ -1114,7 +1119,8 @@ function bootstrap(): void {
       llmControllers.get(payload.requestId)?.abort();
       rag.cancel(payload.requestId);
       const apiKey = settings.getLlmApiKey();
-      if (!apiKey) {
+      const useCodex = !!settings.data.codex?.enabled && payload.mode !== 'translate';
+      if (!useCodex && !apiKey) {
         sendEv({ requestId: payload.requestId, kind: 'error', message: T().noApiKey });
         return;
       }
@@ -1122,6 +1128,28 @@ function bootstrap(): void {
       const controller = ac;
       llmControllers.set(payload.requestId, controller);
       void (async () => {
+        if (useCodex) {
+          const result = await codexBridge.answer({
+            prompt: buildCodexMeetingPrompt({
+              question: payload.question,
+              freeQuestion: payload.freeQuestion,
+              recentTranscript: payload.recentTranscript,
+              answerLang: payload.answerLang ?? settings.data.llm.answerLang,
+            }),
+            binary: settings.data.codex?.binary ?? 'codex',
+            workspace: settings.data.codex?.workspace?.trim() || app.getPath('home'),
+            threadId: settings.data.codex?.threadId,
+            model: settings.data.codex?.model,
+            signal: controller.signal,
+            onDelta: (text) => sendEv({ requestId: payload.requestId, kind: 'delta', text }),
+          });
+          return {
+            result: { text: result.text } as ChatResult,
+            sources: [],
+            codexThreadId: result.threadId,
+          };
+        }
+
         const isTranslate = payload.mode === 'translate';
         const retrieval = await retrieveForAnswer({
           host: rag,
@@ -1181,17 +1209,20 @@ function bootstrap(): void {
               return { text };
             })
           : await chatStream(
-              { baseUrl: settings.data.llm.baseUrl, model: settings.data.llm.model, apiKey },
+              { baseUrl: settings.data.llm.baseUrl, model: settings.data.llm.model, apiKey: apiKey! },
               messages,
               { onDelta: (text) => sendEv({ requestId: payload.requestId, kind: 'delta', text }) },
               controller.signal,
             );
 
-        return { result, sources: retrieval.sources };
+        return { result, sources: retrieval.sources, codexThreadId: undefined };
       })()
         .then((completed) => {
           if (!completed || controller.signal.aborted) return;
-          const { result: r, sources } = completed;
+          const { result: r, sources, codexThreadId } = completed;
+          if (useCodex && codexThreadId && settings.data.codex?.threadId !== codexThreadId) {
+            settings.applyPatch({ codex: { threadId: codexThreadId } });
+          }
           const u = (r as ChatResult).usage;
           if (u) {
             // prewarm acceptance signal: after a warm, hit ≈ prefix length
@@ -1204,6 +1235,7 @@ function bootstrap(): void {
             kind: 'done',
             text: r.text,
             ...(sources.length ? { sources } : {}),
+            ...(codexThreadId ? { codexThreadId } : {}),
           });
         })
         .catch((e: Error) => {
@@ -1226,6 +1258,7 @@ function bootstrap(): void {
     ipcMain.handle(
       IPC.memoUpdate,
       async (_e, p: { memo: string; question: string; answer: string }): Promise<string> => {
+        if (settings.data.codex?.enabled) return '';
         const apiKey = settings.getLlmApiKey();
         if (!apiKey) return '';
         try {
@@ -1387,6 +1420,7 @@ function bootstrap(): void {
     ragEpoch += 1;
     for (const controller of llmControllers.values()) controller.abort();
     llmControllers.clear();
+    codexBridge.stop();
     void rag.stop();
     void sidecar.stop();
   });

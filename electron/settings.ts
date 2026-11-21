@@ -68,6 +68,11 @@ export function defaultSettings(platform: string = process.platform): SettingsFi
       answerLang: 'chinese',
       answerWithVision: false,
     },
+    codex: {
+      enabled: false,
+      binary: 'codex',
+      workspace: '',
+    },
     vision: {},
     rag: { enabled: false },
     asr: {
@@ -120,6 +125,35 @@ function validateRagPatch(raw: unknown): void {
   }
 }
 
+function normalizeCodexSettings(raw: unknown): SettingsFile['codex'] {
+  const value = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const text = (input: unknown): string => typeof input === 'string' && !input.includes('\0')
+    ? input.trim()
+    : '';
+  const threadId = text(value.threadId);
+  const model = text(value.model);
+  return {
+    enabled: value.enabled === true,
+    binary: text(value.binary) || 'codex',
+    workspace: text(value.workspace),
+    ...(threadId ? { threadId } : {}),
+    ...(model ? { model } : {}),
+  };
+}
+
+function validateCodexPatch(raw: unknown): void {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new TypeError('Invalid Codex settings');
+  const value = raw as Record<string, unknown>;
+  if (value.enabled !== undefined && typeof value.enabled !== 'boolean') {
+    throw new TypeError('Codex enabled must be boolean');
+  }
+  for (const key of ['binary', 'workspace', 'threadId', 'model'] as const) {
+    if (value[key] !== undefined && (typeof value[key] !== 'string' || value[key].includes('\0'))) {
+      throw new TypeError(`Codex ${key} must be a valid string`);
+    }
+  }
+}
+
 /**
  * Per-section spread merge against the defaults. Unknown keys in the stored
  * file survive (forward compatibility); missing ones get the default.
@@ -131,6 +165,7 @@ function mergeWithDefaults(raw: Partial<SettingsFile>, defaults: SettingsFile): 
     llm: { ...defaults.llm, ...raw.llm, model: migrateDeepSeekModel(
       raw.llm?.baseUrl ?? defaults.llm.baseUrl, raw.llm?.model ?? defaults.llm.model,
     ) },
+    codex: normalizeCodexSettings(raw.codex ?? defaults.codex),
     vision: { ...defaults.vision, ...raw.vision },
     rag: normalizeRagSettings(raw.rag),
     asr: {
@@ -334,6 +369,7 @@ export class SettingsStore {
     const previousProtectionPreference = this.data.ui.stealth;
     // Validate before changing any section, so invalid IPC input cannot partially save.
     if (patch.rag !== undefined) validateRagPatch(patch.rag);
+    if (patch.codex !== undefined) validateCodexPatch(patch.codex);
     if (patch.ui?.stealth !== undefined && typeof patch.ui.stealth !== 'boolean') throw new TypeError('Next-launch protection must be boolean');
     if (patch.llm) {
       const { apiKey, ...rest } = patch.llm;
@@ -341,6 +377,12 @@ export class SettingsStore {
       if (apiKey !== undefined) {
         this.writeKey(this.data.llm, apiKey, rest.verification !== undefined);
       }
+    }
+    if (patch.codex) {
+      this.data.codex = normalizeCodexSettings({
+        ...this.data.codex,
+        ...stripUndefined(patch.codex),
+      });
     }
     if (patch.vision) {
       const { apiKey, ...rest } = patch.vision;
@@ -453,6 +495,13 @@ export class SettingsStore {
         providerId: d.llm.providerId,
         apiKeyHint: d.llm.apiKeyHint,
         verification: d.llm.verification,
+      },
+      codex: {
+        enabled: !!d.codex?.enabled,
+        binary: d.codex?.binary?.trim() || 'codex',
+        workspace: d.codex?.workspace?.trim() || '',
+        threadId: d.codex?.threadId?.trim() || undefined,
+        model: d.codex?.model?.trim() || undefined,
       },
       vision: {
         baseUrl: d.vision.baseUrl,

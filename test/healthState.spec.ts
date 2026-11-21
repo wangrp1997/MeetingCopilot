@@ -33,6 +33,7 @@ function settings(over: Partial<PublicSettings> = {}): PublicSettings {
       answerWithVision: false,
       apiKeySet: true,
     },
+    codex: { enabled: false, binary: 'codex', workspace: '' },
     vision: { apiKeySet: false },
     knowledge: { chars: 0 },
     asr: {
@@ -160,6 +161,16 @@ describe('deriveServiceHealth — LLM, audio, vision', () => {
     const s = settings();
     s.llm.verification = badVerdict;
     expect(deriveServiceHealth(input({ settings: s })).answersAvailable).toBe(true);
+  });
+
+  it('uses Codex without requiring an OpenAI-compatible API key', () => {
+    const s = settings();
+    s.llm.apiKeySet = false;
+    s.codex = { enabled: true, binary: 'codex', workspace: '/tmp/project' };
+    const h = deriveServiceHealth(input({ settings: s }));
+    expect(h.llm.state).toBe('ok');
+    expect(h.llm.local).toBe(true);
+    expect(h.answersAvailable).toBe(true);
   });
 
   it('tracks audio capture', () => {

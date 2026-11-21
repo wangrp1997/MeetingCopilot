@@ -357,6 +357,11 @@ export function App() {
           }),
         })),
       );
+      if (ev.kind === 'done' && ev.codexThreadId) {
+        setSettings((current) => current
+          ? { ...current, codex: { ...current.codex, threadId: ev.codexThreadId } }
+          : current);
+      }
       // fold finished ANSWER turns into the session memo (async, off-path);
       // translate/vision turns are not interview Q&A
       if (ev.kind === 'done') {

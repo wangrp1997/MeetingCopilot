@@ -12,10 +12,10 @@ English version: [QUICK_START.en.md](QUICK_START.en.md)
 |---|---|
 | 系统 | Windows 10 / 11（64 位）。macOS 暂无安装包，请见 [INSTALL_MACOS.en.md](INSTALL_MACOS.en.md) |
 | 网络 | 能访问你所选服务商的接口即可 |
-| API Key | 语音识别与 AI 回答各需要一个（同一服务商可复用）；Key 由你自己创建，费用由服务商收取 |
+| API Key | 本地免费 + Codex 方案不需要云端 Key；云端语音识别与 AI 回答各需一个（同一服务商可复用） |
 | 时间 | 第一次配置约 5 分钟，主要花在注册和复制 Key 上 |
 
-MeetingCopilot 采用 **BYOK（自带 Key）**：没有账号系统、没有服务器、不代收任何费用。不清楚 API Key 是什么，先看 [API_KEYS.zh-CN.md](API_KEYS.zh-CN.md)。
+云端方案采用 **BYOK（自带 Key）**：没有账号系统、没有服务器、不代收任何费用。本地 FunASR + Codex 方案不需要填写云端 Key，但要求本机已安装 Python 与 Codex CLI。不清楚 API Key 是什么，先看 [API_KEYS.zh-CN.md](API_KEYS.zh-CN.md)。
 
 ---
 
@@ -47,12 +47,13 @@ MeetingCopilot 采用 **BYOK（自带 Key）**：没有账号系统、没有服�
 
 | 方案 | 组合 | 需要几个 Key | 适合谁 |
 |---|---|---|---|
-| **低延迟推荐** | 阿里云百炼实时语音识别 + DeepSeek AI 回答 | 2 个 | 想要最好字幕实时性、中英混说场景 |
+| **本地免费 + Codex** | 本机 FunASR 实时识别 + 当前 Codex 对话 | 0 个云端 Key | 希望免费、本地转写，并直接在 Codex 中补充项目背景 |
+| **云端低延迟** | 阿里云百炼实时语音识别 + DeepSeek AI 回答 | 2 个 | 想要最好字幕实时性、中英混说场景 |
 | **极简配置** | MiMo 语音识别 + MiMo AI 回答 | 1 个（可勾选共用） | 只想注册一个平台；字幕按整句返回，跟随性弱一些（Beta） |
 | **只使用实时转写** | 阿里云百炼实时语音识别 | 1 个 | 暂时不需要 AI 回答 |
 | **高级配置与本地模式** | 不改任何设置，直接进入主界面 | 0 个 | 想用本地 FunASR / MOSS / Whisper 或自定义服务商 |
 
-选「高级配置与本地模式」会直接结束向导进入主界面，之后在设置里自行配置。
+选择「本地免费 + Codex」会直接启用本机 FunASR 和 Codex，不显示 API Key 输入框。首次运行需要下载约 1.7–2 GB 模型。选择「高级配置与本地模式」会直接结束向导进入主界面，之后在设置里自行配置。
 
 ### 3️⃣ 配置服务
 

@@ -321,3 +321,32 @@ export function buildAnswerMessages(input: AnswerPromptInput): ChatMessage[] {
   msgs.push({ role: 'user', content: `${contextBlock}\n\n${ask}` });
   return msgs;
 }
+
+/**
+ * Codex keeps the rolling conversation itself. This prompt supplies only the
+ * fast-changing speech context, then asks for the same teleprompter-sized
+ * answer that MeetingCopilot already knows how to render.
+ */
+export function buildCodexMeetingPrompt(input: {
+  question?: string;
+  freeQuestion?: string;
+  recentTranscript: string[];
+  answerLang?: AnswerLang;
+}): string {
+  const recent = input.recentTranscript
+    .slice(-10)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n')
+    .slice(-MAX_CONTEXT_CHARS);
+  const question = (input.question || input.freeQuestion || '').trim();
+  const language = input.answerLang === 'english' ? '英文' : '中文';
+  return [
+    '这是正在进行的实时会议。下面的转写来自语音识别，可能有错字、断句或说话人串音。',
+    '请直接给出我接下来可以照着说的回答，不要解释你的思考过程。',
+    `用${language}回答。第一句直接回应问题，随后给 2-3 个短要点，整体控制在 150-350 字。`,
+    '优先使用当前线程中已经确认的项目背景和事实。缺少事实时给出稳妥说法，不要编造项目经历或数字。',
+    recent ? `【最近的语音转写】\n${recent}` : '【最近的语音转写】\n（暂无）',
+    question ? `【本轮需要回答的内容】\n“${question}”` : '【本轮需要回答的内容】\n请回应最近一段对方发言。',
+  ].join('\n\n');
+}

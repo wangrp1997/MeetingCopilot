@@ -235,6 +235,38 @@ describe('SettingsStore', () => {
   });
 });
 
+describe('Codex meeting bridge settings', () => {
+  it('defaults off and persists a resumable thread configuration', () => {
+    const store = new SettingsStore(file, fakeCipher);
+    expect(store.getPublic().codex).toEqual({ enabled: false, binary: 'codex', workspace: '' });
+
+    store.applyPatch({
+      codex: {
+        enabled: true,
+        binary: '/Users/example/.local/bin/codex',
+        workspace: '/Users/example/project',
+        threadId: 'thread-123',
+        model: 'gpt-6',
+      },
+    });
+
+    expect(new SettingsStore(file, fakeCipher).getPublic().codex).toEqual({
+      enabled: true,
+      binary: '/Users/example/.local/bin/codex',
+      workspace: '/Users/example/project',
+      threadId: 'thread-123',
+      model: 'gpt-6',
+    });
+  });
+
+  it('can clear the selected thread to start a new meeting', () => {
+    const store = new SettingsStore(file, fakeCipher);
+    store.applyPatch({ codex: { threadId: 'thread-123' } });
+    store.applyPatch({ codex: { threadId: '' } });
+    expect(store.getPublic().codex.threadId).toBeUndefined();
+  });
+});
+
 // ---------------------------------------------------------------- v2 schema
 
 /** a realistic pre-v2 file: real ciphertexts, cloud realtime ASR, custom vision */

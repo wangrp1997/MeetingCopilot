@@ -64,6 +64,16 @@ try {
     assert.equal(await button('📚 Library').count(), 0);
     await shot('01-main-default-off');
   });
+  await test('Codex meeting bridge settings expose workspace and resumable thread controls', async () => {
+    await button('Settings').click();
+    await page.getByText('Codex live meeting bridge', { exact: true }).waitFor();
+    const codexRow = page.locator('.settings-row').filter({ has: page.locator('label').filter({ hasText: /^Answer with Codex$/ }) });
+    await codexRow.locator('select').selectOption('on');
+    await page.getByText('Project workspace', { exact: true }).waitFor();
+    await page.getByText('Meeting thread ID', { exact: true }).waitFor();
+    await button('Cancel').click();
+    await poll(async () => await page.locator('.settings').count() === 0, 'Codex settings cancel');
+  });
   await test('same-surface hover, keyboard focus and Escape hints', async () => {
     const hint = button('New session');
     assert.equal(await hint.getAttribute('title'), null);

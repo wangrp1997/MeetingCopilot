@@ -34,7 +34,11 @@ export function CompleteStep({
   onEnterAndImport,
 }: CompleteStepProps) {
   const def = planDefinition(plan);
+  const hasAsr = !!def.asr || !!def.localAsr;
+  const hasAnswer = !!def.llm || !!def.answerWithCodex;
   const presetName = (which: 'asr' | 'llm') => {
+    if (which === 'asr' && def.localAsr) return t.complete.localAsrValue;
+    if (which === 'llm' && def.answerWithCodex) return t.complete.codexValue;
     const slot = which === 'asr' ? def.asr : def.llm;
     if (!slot) return t.complete.llmSkipped;
     return lang === 'zh' ? slot.preset.nameZh : slot.preset.nameEn;
@@ -52,13 +56,13 @@ export function CompleteStep({
             <span className="check-label">{t.complete.planLabel}</span>
             <span className="check-value">{t.planNames[plan]}</span>
           </div>
-          <div className={`check-row ${def.asr ? 'is-ok' : 'is-na'}`}>
-            <span className="check-mark">{def.asr ? '✓' : '–'}</span>
+          <div className={`check-row ${hasAsr ? 'is-ok' : 'is-na'}`}>
+            <span className="check-mark">{hasAsr ? '✓' : '–'}</span>
             <span className="check-label">{t.complete.asrLabel}</span>
             <span className="check-value">{presetName('asr')}</span>
           </div>
-          <div className={`check-row ${def.llm ? 'is-ok' : 'is-na'}`}>
-            <span className="check-mark">{def.llm ? '✓' : '–'}</span>
+          <div className={`check-row ${hasAnswer ? 'is-ok' : 'is-na'}`}>
+            <span className="check-mark">{hasAnswer ? '✓' : '–'}</span>
             <span className="check-label">{t.complete.llmLabel}</span>
             <span className="check-value">{presetName('llm')}</span>
           </div>
@@ -78,13 +82,17 @@ export function CompleteStep({
             <span className="check-mark">
               {settings.llm.apiKeySet || !def.llm ? '✓' : '○'}
             </span>
-            <span className="check-label">{t.connection.rowLlmKey}</span>
+            <span className="check-label">
+              {def.answerWithCodex ? t.connection.rowCodex : t.connection.rowLlmKey}
+            </span>
             <span className="check-value">
-              {def.llm
-                ? settings.llm.apiKeySet
-                  ? t.connection.saved
-                  : t.connection.unsaved
-                : t.connection.notNeeded}
+              {def.answerWithCodex
+                ? t.connection.codexReady
+                : def.llm
+                  ? settings.llm.apiKeySet
+                    ? t.connection.saved
+                    : t.connection.unsaved
+                  : t.connection.notNeeded}
             </span>
           </div>
         </div>

@@ -69,11 +69,13 @@ export function ProviderStep({
   const shared = def.canShareKey && shareMimoKey && !!def.asr && !!def.llm;
 
   const subtitle =
-    plan === 'mimo-simple'
-      ? t.provider.subtitleMimo
-      : plan === 'transcription-only'
-        ? t.provider.subtitleTranscription
-        : t.provider.subtitleRecommended;
+    plan === 'local-codex'
+      ? t.provider.subtitleLocal
+      : plan === 'mimo-simple'
+        ? t.provider.subtitleMimo
+        : plan === 'transcription-only'
+          ? t.provider.subtitleTranscription
+          : t.provider.subtitleRecommended;
 
   const labelForSlot = (slot: ProviderSlot): string =>
     slot === 'llm' ? t.provider.rowLlmTest : t.provider.rowAsrTest;
@@ -89,7 +91,17 @@ export function ProviderStep({
       <h1 className="setup-h1">{t.provider.title}</h1>
       <p className="setup-sub">{subtitle}</p>
 
-      {shared && def.asr && def.llm ? (
+      {plan === 'local-codex' ? (
+        <section className="setup-card">
+          <div className="setup-card-title">{t.provider.localNoKeyTitle}</div>
+          <p>{t.provider.localNoKeyBody}</p>
+          <ul className="setup-list">
+            {t.provider.localNoKeyBullets.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ) : shared && def.asr && def.llm ? (
         <ApiKeyCard
           title={t.provider.sharedCardTitle}
           preset={def.llm.preset}

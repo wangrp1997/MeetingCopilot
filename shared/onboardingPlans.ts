@@ -32,6 +32,10 @@ export interface PlanDefinition {
   /** text LLM; absent for 'transcription-only' and 'advanced' */
   llm?: PlanSlot;
   backend?: 'cloud' | 'cloud-realtime';
+  /** the plan uses the local FunASR sidecar and therefore needs no ASR key */
+  localAsr?: boolean;
+  /** the plan answers through the local Codex CLI bridge instead of a cloud LLM */
+  answerWithCodex?: boolean;
   /** the two slots live on the same provider, so one key can serve both */
   canShareKey: boolean;
 }
@@ -49,6 +53,13 @@ function requirePreset(id: string): ProviderPreset {
 
 export function planDefinition(plan: OnboardingPlan): PlanDefinition {
   switch (plan) {
+    case 'local-codex':
+      return {
+        plan,
+        localAsr: true,
+        answerWithCodex: true,
+        canShareKey: false,
+      };
     case 'recommended':
       return {
         plan,
@@ -101,6 +112,13 @@ export function buildPlanPatch(plan: OnboardingPlan, opts: PlanPatchOptions): Se
       ...(opts.themDeviceId !== undefined ? { themDeviceId: opts.themDeviceId } : {}),
     },
   };
+  if (def.localAsr) {
+    patch.asr = {
+      backend: 'local-realtime',
+      localRealtime: { model: 'fun-asr-nano' },
+    };
+    patch.codex = { enabled: true };
+  }
   if (def.asr && def.backend) {
     const { preset } = def.asr;
     patch.asr = {

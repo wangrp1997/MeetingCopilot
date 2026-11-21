@@ -140,6 +140,11 @@ export function SettingsPanel({
   const t = useT();
   const [baseUrl, setBaseUrl] = useState(settings.llm.baseUrl);
   const [model, setModel] = useState(settings.llm.model);
+  const [codexEnabled, setCodexEnabled] = useState(settings.codex.enabled);
+  const [codexBinary, setCodexBinary] = useState(settings.codex.binary);
+  const [codexWorkspace, setCodexWorkspace] = useState(settings.codex.workspace);
+  const [codexThreadId, setCodexThreadId] = useState(settings.codex.threadId ?? '');
+  const [codexModel, setCodexModel] = useState(settings.codex.model ?? '');
   const [answerLang, setAnswerLang] = useState<AnswerLang>(settings.llm.answerLang);
   const [language, setLanguage] = useState<AsrLanguage>(settings.asr.language);
   const [hotkey, setHotkey] = useState(settings.ui.hotkeyToggle);
@@ -272,6 +277,13 @@ export function SettingsPanel({
           answerLang,
           providerId: providerIdForEndpoint(baseUrl.trim(), model.trim(), 'text-llm'),
           ...(llmApiKey !== undefined ? { apiKey: llmApiKey } : {}),
+        },
+        codex: {
+          enabled: codexEnabled,
+          binary: codexBinary.trim() || 'codex',
+          workspace: codexWorkspace.trim(),
+          threadId: codexThreadId.trim(),
+          model: codexModel.trim(),
         },
         vision: {
           baseUrl: visionBaseUrl.trim(),
@@ -516,6 +528,7 @@ export function SettingsPanel({
   };
 
   const llmSummary = (): string => {
+    if (codexEnabled) return 'Codex CLI';
     const p = findPresetByEndpoint(baseUrl, model, 'text-llm');
     return p ? presetName(p) : `${model || '—'}`;
   };
@@ -615,6 +628,63 @@ export function SettingsPanel({
         })}
       </div>
       {keyRow(t.settings.apiKey, llmKey, 'llm', llmTarget())}
+      <div className="settings-section">{t.settings.codexSection}</div>
+      <div className="settings-hint">{t.settings.codexHint}</div>
+      <div className="settings-row">
+        <label>{t.settings.codexEnabled}</label>
+        <select
+          value={codexEnabled ? 'on' : 'off'}
+          onChange={(e) => setCodexEnabled(e.target.value === 'on')}
+        >
+          <option value="off">{t.settings.codexOff}</option>
+          <option value="on">{t.settings.codexOn}</option>
+        </select>
+      </div>
+      {codexEnabled && (
+        <>
+          <div className="settings-row">
+            <label>{t.settings.codexBinary}</label>
+            <input
+              value={codexBinary}
+              onChange={(e) => setCodexBinary(e.target.value)}
+              spellCheck={false}
+              placeholder="codex"
+            />
+          </div>
+          <div className="settings-row">
+            <label>{t.settings.codexWorkspace}</label>
+            <input
+              value={codexWorkspace}
+              onChange={(e) => setCodexWorkspace(e.target.value)}
+              spellCheck={false}
+              placeholder={t.settings.codexWorkspacePlaceholder}
+            />
+          </div>
+          <div className="settings-row">
+            <label>{t.settings.codexThreadId}</label>
+            <input
+              value={codexThreadId}
+              onChange={(e) => setCodexThreadId(e.target.value)}
+              spellCheck={false}
+              placeholder={t.settings.codexThreadPlaceholder}
+            />
+          </div>
+          <div className="settings-row">
+            <label>{t.settings.codexModel}</label>
+            <input
+              value={codexModel}
+              onChange={(e) => setCodexModel(e.target.value)}
+              spellCheck={false}
+              placeholder={t.settings.codexModelPlaceholder}
+            />
+          </div>
+          <div className="settings-hint">
+            {codexThreadId.trim()
+              ? t.settings.codexResumeHint(codexThreadId.trim())
+              : t.settings.codexNewThreadHint}
+          </div>
+        </>
+      )}
       <div className="settings-row">
         <label>{t.settings.answerLangLabel}</label>
         <select value={answerLang} onChange={(e) => setAnswerLang(e.target.value as AnswerLang)}>

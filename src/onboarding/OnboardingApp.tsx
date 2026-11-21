@@ -64,6 +64,7 @@ function completionBlocked(
 ): boolean {
   const def = planDefinition(plan);
   if (plan === 'advanced') return false;
+  if (plan === 'local-codex') return !audioOk;
   if (def.asr && !slotState(settings, def.asr.slot).configured) return true;
   if (def.llm && !slotState(settings, def.llm.slot).configured) return true;
   return !audioOk;
@@ -72,7 +73,7 @@ function completionBlocked(
 export function OnboardingApp() {
   const [step, setStep] = useState(FIRST_STEP);
   const [lang, setLang] = useState<UiLang>('zh');
-  const [plan, setPlan] = useState<OnboardingPlan>('recommended');
+  const [plan, setPlan] = useState<OnboardingPlan>('local-codex');
   const [shareMimoKey, setShareMimoKey] = useState(true);
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [info, setInfo] = useState<AppInfo | null>(null);

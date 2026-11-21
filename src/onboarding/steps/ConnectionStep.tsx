@@ -526,21 +526,25 @@ export function ConnectionStep({
       <section className="setup-card">
         <div className="setup-card-title">{t.connection.summaryTitle}</div>
         <div className="check-list">
-          {asrKey &&
-            row(
-              'asr',
-              asrKey.configured ? 'ok' : 'todo',
-              t.connection.rowAsrKey,
-              asrKey.configured ? t.connection.saved : t.connection.unsaved,
-            )}
-          {llmKey
-            ? row(
-                'llm',
-                llmKey.configured ? 'ok' : 'todo',
-                t.connection.rowLlmKey,
-                llmKey.configured ? t.connection.saved : t.connection.unsaved,
-              )
-            : row('llm', 'na', t.connection.rowLlmKey, t.connection.notNeeded)}
+          {def.localAsr
+            ? row('asr-local', 'ok', t.connection.rowLocalAsr, t.connection.localReady)
+            : asrKey &&
+              row(
+                'asr',
+                asrKey.configured ? 'ok' : 'todo',
+                t.connection.rowAsrKey,
+                asrKey.configured ? t.connection.saved : t.connection.unsaved,
+              )}
+          {def.answerWithCodex
+            ? row('codex', 'ok', t.connection.rowCodex, t.connection.codexReady)
+            : llmKey
+              ? row(
+                  'llm',
+                  llmKey.configured ? 'ok' : 'todo',
+                  t.connection.rowLlmKey,
+                  llmKey.configured ? t.connection.saved : t.connection.unsaved,
+                )
+              : row('llm', 'na', t.connection.rowLlmKey, t.connection.notNeeded)}
           {row(
             'audio',
             audioOk ? 'ok' : 'todo',

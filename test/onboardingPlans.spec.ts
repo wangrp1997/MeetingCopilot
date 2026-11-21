@@ -15,6 +15,15 @@ describe('onboarding plan definitions', () => {
     }
   });
 
+  it('defines a keyless local ASR + Codex plan', () => {
+    const def = planDefinition('local-codex');
+    expect(def.localAsr).toBe(true);
+    expect(def.answerWithCodex).toBe(true);
+    expect(def.asr).toBeUndefined();
+    expect(def.llm).toBeUndefined();
+    expect(def.backend).toBeUndefined();
+  });
+
   it('wires the recommended plan to realtime ASR + a text LLM', () => {
     const def = planDefinition('recommended');
     expect(def.backend).toBe('cloud-realtime');
@@ -65,6 +74,18 @@ describe('buildPlanPatch', () => {
       model: llm.model,
       providerId: llm.providerId,
     });
+  });
+
+  it('enables local FunASR and Codex without any cloud key slot', () => {
+    const patch = buildPlanPatch('local-codex', opts);
+    expect(patch.asr).toEqual({
+      backend: 'local-realtime',
+      localRealtime: { model: 'fun-asr-nano' },
+    });
+    expect(patch.codex).toEqual({ enabled: true });
+    expect(patch.llm).toBeUndefined();
+    expect(patch.asr?.realtime).toBeUndefined();
+    expect(patch.asr?.cloud).toBeUndefined();
   });
 
   it('uses the segment slot for the minimal plan', () => {

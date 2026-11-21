@@ -25,6 +25,7 @@ const zh = {
     loading: '正在加载…',
     beta: 'Beta',
     recommended: '推荐',
+    free: '免费',
     optional: '可选',
     bootFail: (msg: string) => `读取配置失败：${msg}`,
     version: (v: string, platform: string) => `版本 ${v} · ${platform}`,
@@ -38,10 +39,10 @@ const zh = {
   },
   welcome: {
     title: '欢迎使用 MeetingCopilot',
-    body: '无需安装 Node.js、Python 或运行任何命令。完成几个简单设置后，即可开始实时转写与 AI 辅助。',
-    byokTitle: 'BYOK：使用你自己的 API Key',
+    body: '使用本机 FunASR 与 Codex CLI 即可完全免费运行，也可以按需选择云端语音识别服务。',
+    byokTitle: '云端方案才需要 API Key',
     byokBody:
-      'MeetingCopilot 采用 BYOK 模式：你需要使用自己的云服务 API Key。API 费用由相应服务商收取，MeetingCopilot 不代收费用。',
+      '本地 FunASR 不发送会议音频，也不需要语音识别 Key。Codex CLI 直接使用当前登录的 Codex 账号；只有选择云 ASR 或云 LLM 时才需要相应平台的 API Key。',
     keyExplainTitle: 'API Key 是什么？',
     keyExplainBody:
       'API Key 可以理解为云服务商发给你的“专用通行证”。它不是你的账号密码，也不要把账号密码粘贴到这里。MeetingCopilot 使用 API Key 直接连接你选择的语音识别和 AI 服务。',
@@ -58,8 +59,12 @@ const zh = {
   },
   plan: {
     title: '选择使用方案',
-    subtitle: '两个方案都可以在完成后于设置中随时更改。',
-    recommendedName: '低延迟推荐',
+    subtitle: '可以选择完全免费的本地方案，也可以使用云端服务。完成后都能在设置中更改。',
+    localName: '本地免费 + Codex',
+    localSummary: '本机 FunASR 实时转写 + 当前 Codex 对话',
+    localBullets: ['不需要语音识别 API Key', '不需要大模型 API Key', '音频和转写留在本机'],
+    localNote: '首次使用会下载约 1.7 GB 本地模型；Codex 需要已安装并登录。',
+    recommendedName: '云端低延迟',
     recommendedSummary: '阿里云实时语音识别 + DeepSeek AI 回答',
     recommendedBullets: ['字幕实时性最好', '中英文混合识别', '无需安装本地模型'],
     recommendedNote: '需要两个 API Key。',
@@ -77,6 +82,11 @@ const zh = {
   },
   provider: {
     title: '配置服务',
+    subtitleLocal: '这一方案不需要填写任何 API Key。',
+    localNoKeyTitle: '已选择全本地方案',
+    localNoKeyBody:
+      '语音识别使用本机 FunASR-Nano，AI 回答使用你已经登录的 Codex CLI。点击完成时会自动开启这两项，不再要求云端密钥。',
+    localNoKeyBullets: ['首次启动自动下载本地语音模型', '会议音频不会发送给云端 ASR', 'Codex 线程会保留你补充的项目背景'],
     subtitleRecommended: '为下面两项服务分别粘贴 API Key。',
     subtitleMimo: '在 MiMo 平台创建一个 API Key，即可同时用于语音识别与 AI 回答。',
     subtitleTranscription: '只需要配置语音识别服务。',
@@ -193,6 +203,10 @@ const zh = {
     summaryTitle: '配置检查',
     rowAsrKey: '语音识别 API Key',
     rowLlmKey: 'AI 回答 API Key',
+    rowLocalAsr: '本地 FunASR',
+    rowCodex: 'Codex CLI',
+    localReady: '已选择，本机运行',
+    codexReady: '已选择，不填 API Key',
     rowAudio: '电脑声音',
     rowMic: '麦克风',
     rowVision: '视觉问答',
@@ -228,6 +242,8 @@ const zh = {
     llmLabel: 'AI 回答',
     micLabel: '麦克风',
     llmSkipped: '暂未配置（可稍后在设置中添加）',
+    localAsrValue: 'FunASR-Nano（本地免费）',
+    codexValue: 'Codex CLI（当前登录账号）',
     tip: '进入主界面后点击「▶ 开始」采集系统声音；在右栏可以导入简历与岗位 JD，让回答更贴合你。',
     enter: '进入 MeetingCopilot',
     importMaterial: '导入简历或背景材料',
@@ -235,11 +251,12 @@ const zh = {
     applyFail: (msg: string) => `应用配置失败：${msg}`,
   },
   planNames: {
-    recommended: '低延迟推荐',
+    'local-codex': '本地免费 + Codex',
+    recommended: '云端低延迟',
     'mimo-simple': '极简配置（Beta）',
     'transcription-only': '仅实时转写',
     advanced: '高级配置与本地模式',
-  } as Record<'recommended' | 'mimo-simple' | 'transcription-only' | 'advanced', string>,
+  },
 };
 
 export type SetupDict = typeof zh;
@@ -256,6 +273,7 @@ const en: SetupDict = {
     loading: 'Loading…',
     beta: 'Beta',
     recommended: 'Recommended',
+    free: 'Free',
     optional: 'Optional',
     bootFail: (msg: string) => `Could not read the configuration: ${msg}`,
     version: (v: string, platform: string) => `Version ${v} · ${platform}`,
@@ -290,8 +308,12 @@ const en: SetupDict = {
   },
   plan: {
     title: 'Choose how you want to use it',
-    subtitle: 'Either plan can be changed later in Settings.',
-    recommendedName: 'Low latency (recommended)',
+    subtitle: 'Choose a fully free local setup or a cloud service. You can change it later in Settings.',
+    localName: 'Local free + Codex',
+    localSummary: 'On-device FunASR captions + your current Codex conversation',
+    localBullets: ['No speech-recognition API key', 'No LLM API key', 'Audio and transcript stay on this computer'],
+    localNote: 'The first run downloads a ~1.7 GB local model. Codex must already be installed and signed in.',
+    recommendedName: 'Cloud low latency',
     recommendedSummary: 'Aliyun realtime speech recognition + DeepSeek answers',
     recommendedBullets: [
       'Best live-caption responsiveness',
@@ -313,6 +335,11 @@ const en: SetupDict = {
   },
   provider: {
     title: 'Configure your services',
+    subtitleLocal: 'This plan does not require any API key.',
+    localNoKeyTitle: 'Fully local plan selected',
+    localNoKeyBody:
+      'Speech recognition runs in the local FunASR-Nano sidecar and answers use the Codex CLI account already signed in on this computer. Finishing setup enables both without asking for cloud credentials.',
+    localNoKeyBullets: ['The first start downloads the local speech model', 'Meeting audio is not sent to a cloud ASR service', 'The Codex thread keeps the project context you add later'],
     subtitleRecommended: 'Paste an API key for each of the two services below.',
     subtitleMimo:
       'Create one API key on the MiMo platform and it can serve both speech recognition and AI answers.',
@@ -433,6 +460,10 @@ const en: SetupDict = {
     summaryTitle: 'Configuration check',
     rowAsrKey: 'Speech-recognition API key',
     rowLlmKey: 'AI answer API key',
+    rowLocalAsr: 'Local FunASR',
+    rowCodex: 'Codex CLI',
+    localReady: 'Selected, runs on this computer',
+    codexReady: 'Selected, no API key required',
     rowAudio: 'Computer audio',
     rowMic: 'Microphone',
     rowVision: 'Visual Q&A',
@@ -469,6 +500,8 @@ const en: SetupDict = {
     llmLabel: 'AI answers',
     micLabel: 'Microphone',
     llmSkipped: 'Not configured (you can add it later in Settings)',
+    localAsrValue: 'FunASR-Nano (local and free)',
+    codexValue: 'Codex CLI (signed-in account)',
     tip: 'In the main window click "▶ Start" to capture system audio; import your resume and the job description in the right pane for answers tailored to you.',
     enter: 'Open MeetingCopilot',
     importMaterial: 'Import a resume or background material',
@@ -476,7 +509,8 @@ const en: SetupDict = {
     applyFail: (msg: string) => `Could not apply the configuration: ${msg}`,
   },
   planNames: {
-    recommended: 'Low latency (recommended)',
+    'local-codex': 'Local free + Codex',
+    recommended: 'Cloud low latency',
     'mimo-simple': 'Minimal setup (Beta)',
     'transcription-only': 'Transcription only',
     advanced: 'Advanced setup and local modes',

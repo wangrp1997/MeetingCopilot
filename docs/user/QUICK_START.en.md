@@ -12,10 +12,10 @@ For people who downloaded an installer. No Node.js, no Python, no commands.
 |---|---|
 | OS | Windows 10 / 11 (64-bit). There is no macOS installer yet — see [INSTALL_MACOS.en.md](INSTALL_MACOS.en.md) |
 | Network | Enough to reach the providers you choose |
-| API keys | One for speech recognition, one for AI answers (a single provider can cover both). You create them; the provider bills you |
+| API keys | The Local free + Codex plan needs no cloud keys. Cloud plans use one key for speech recognition and one for AI answers (a single provider can cover both) |
 | Time | About 5 minutes the first time, mostly signing up and copying keys |
 
-MeetingCopilot is **bring-your-own-key**: no accounts, no server, no fee collected by this app. If "API key" means nothing to you yet, read [API_KEYS.en.md](API_KEYS.en.md) first.
+Cloud plans are **bring-your-own-key**: no accounts, no server, and no fee collected by this app. The local FunASR + Codex plan needs no cloud keys, but requires Python and Codex CLI on this computer. If "API key" means nothing to you yet, read [API_KEYS.en.md](API_KEYS.en.md) first.
 
 ---
 
@@ -47,12 +47,13 @@ The toggle in the top-right switches **中文 / English**, and that choice becom
 
 | Plan | Combination | Keys needed | Good for |
 |---|---|---|---|
-| **Low latency (recommended)** | Alibaba Cloud realtime ASR + DeepSeek answers | 2 | The snappiest captions, mixed Chinese/English meetings |
+| **Local free + Codex** | On-device FunASR + your current Codex conversation | No cloud keys | Free local transcription with project context kept in Codex |
+| **Cloud low latency** | Alibaba Cloud realtime ASR + DeepSeek answers | 2 | The snappiest captions, mixed Chinese/English meetings |
 | **Minimal setup** | MiMo ASR + MiMo answers | 1 (one key can serve both) | Signing up with a single platform. Captions arrive per sentence, so they trail a little (Beta) |
 | **Transcription only** | Alibaba Cloud realtime ASR | 1 | You do not want AI answers yet |
 | **Advanced / local** | Changes nothing, goes straight to the app | 0 | You plan to use local FunASR / MOSS / Whisper or a custom provider |
 
-"Advanced / local" ends the wizard immediately; configure everything from Settings afterwards.
+"Local free + Codex" enables on-device FunASR and Codex without showing API-key fields. The first run downloads a roughly 1.7–2 GB model. "Advanced / local" ends the wizard immediately; configure everything from Settings afterwards.
 
 ### 3️⃣ Configure the services
 

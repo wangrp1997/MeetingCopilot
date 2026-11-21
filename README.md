@@ -48,7 +48,7 @@ Protection is best-effort, not guaranteed invisibility. Confirm the current stat
 | `MeetingCopilot-<version>-win-x64.exe` | Installer (NSIS, per-user) | Normal use — Start-menu and desktop shortcuts, upgrades in place |
 | `MeetingCopilot-<version>-win-x64-portable.exe` | Portable | Not installing anything; note that settings still live in `%APPDATA%` |
 
-**Requirements:** Windows 10 / 11 (x64), no administrator rights, plus your own API key(s) — MeetingCopilot is bring-your-own-key and collects no fee.
+**Requirements:** Windows 10 / 11 (x64) or Apple-silicon macOS 14+. The local FunASR + Codex plan needs no cloud key, but requires an installed and signed-in Codex CLI. Cloud plans remain bring-your-own-key and collect no fee.
 
 > ⚠️ **This beta is not code-signed yet**, so Windows SmartScreen will warn you. Confirm the file came from the official release page, then *More info → Run anyway*. Each `.exe` ships a matching `.exe.sha256` with the hash CI computed — verify it with `Get-FileHash .\MeetingCopilot-<version>-win-x64.exe -Algorithm SHA256`.
 
@@ -72,15 +72,15 @@ Protection is best-effort, not guaranteed invisibility. Confirm the current stat
 
 The first launch opens a setup wizard — a normal, screen-shareable window, so someone can walk you through it remotely. Five steps:
 
-1. **Welcome** — what bring-your-own-key means, what an API key is, and exactly what leaves your machine. Pick 中文 / English here; that becomes the app's language.
-2. **Plan** — *Low latency* (Alibaba Cloud realtime ASR + DeepSeek answers, 2 keys), *Minimal* (MiMo for both, 1 key, Beta), *Transcription only* (1 key), or *Advanced / local* (change nothing, configure it yourself).
-3. **Services** — the provider tutorial is inline: open the key page, paste, "Save and test connection". Keys are encrypted with the OS credential store before they touch disk.
+1. **Welcome** — how the free local plan works, what bring-your-own-key means for cloud plans, what an API key is, and exactly what leaves your machine. Pick 中文 / English here; that becomes the app's language.
+2. **Plan** — *Local free + Codex* (on-device FunASR + your current Codex conversation, no cloud keys), *Cloud low latency* (Alibaba Cloud realtime ASR + DeepSeek answers, 2 keys), *Minimal* (MiMo for both, 1 key, Beta), *Transcription only* (1 key), or *Advanced*.
+3. **Services** — the local free + Codex plan shows no key fields. Cloud plans keep the inline provider tutorial, and keys are encrypted with the OS credential store before they touch disk.
 4. **Connection test** — a live level meter proves the app can hear your computer, plus the optional microphone channel and a checklist of what is still missing.
 5. **Done** — the whole plan is written as one settings update and the main window opens.
 
 ![Setup wizard, step 2: choosing a plan](docs/setup-wizard-en.png)
 
-*Step 2 "Plan": each card states plainly how many platforms you have to sign up for and how many keys it needs; "Low latency" is preselected. Local backends stay out of the way behind the "Advanced setup and local modes" link.*
+*Step 2 "Plan" presents Local free + Codex beside the cloud choices and states how many keys each one needs. The image shows the original cloud-card layout; see the current UI for the local plan.*
 
 ![Setup wizard, step 3: pasting the API keys](docs/setup-keys-en.png)
 

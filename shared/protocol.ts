@@ -116,7 +116,7 @@ export interface ProviderTestResult {
 }
 
 /** the plan the user picked in the first-run wizard */
-export type OnboardingPlan = 'recommended' | 'mimo-simple' | 'transcription-only' | 'advanced';
+export type OnboardingPlan = 'local-codex' | 'recommended' | 'mimo-simple' | 'transcription-only' | 'advanced';
 
 /** first-run wizard state (settings v2) */
 export interface OnboardingState {
@@ -175,6 +175,20 @@ export interface SettingsFile {
     /** last <=4 characters of the saved key, computed main-side at save time */
     apiKeyHint?: string;
     verification?: ProviderVerification;
+  };
+  /** Optional Codex CLI bridge. Replaces the OpenAI-compatible answer backend
+   * while leaving transcription and the overlay untouched. */
+  codex: {
+    enabled: boolean;
+    /** executable name or absolute path; absolute paths are needed when a GUI
+     * launch does not inherit the shell's PATH */
+    binary?: string;
+    /** project directory exposed to the Codex meeting thread */
+    workspace?: string;
+    /** existing Codex thread to resume; empty = create one on the first ask */
+    threadId?: string;
+    /** optional model override for this meeting thread */
+    model?: string;
   };
   vision: {
     baseUrl?: string;
@@ -275,6 +289,13 @@ export interface PublicSettings {
     apiKeyHint?: string;
     verification?: ProviderVerification;
   };
+  codex: {
+    enabled: boolean;
+    binary: string;
+    workspace: string;
+    threadId?: string;
+    model?: string;
+  };
   vision: {
     baseUrl?: string;
     model?: string;
@@ -337,6 +358,13 @@ export interface SettingsPatch {
     apiKey?: string;
     providerId?: ProviderId;
     verification?: ProviderVerification;
+  };
+  codex?: {
+    enabled?: boolean;
+    binary?: string;
+    workspace?: string;
+    threadId?: string;
+    model?: string;
   };
   vision?: {
     baseUrl?: string;
@@ -505,7 +533,14 @@ export interface LlmAskPayload {
 
 export type LlmEvent =
   | { requestId: string; kind: 'delta'; text: string }
-  | { requestId: string; kind: 'done'; text: string; sources?: RagSourceRef[] }
+  | {
+      requestId: string;
+      kind: 'done';
+      text: string;
+      sources?: RagSourceRef[];
+      /** the persisted thread created/reused by the Codex bridge */
+      codexThreadId?: string;
+    }
   | { requestId: string; kind: 'error'; message: string };
 
 // ---------- System tray (main -> renderer) ----------

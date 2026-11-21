@@ -34,6 +34,33 @@ export function PlanStep({
 
       <div className="setup-plans">
         <div
+          className={`plan-card${plan === 'local-codex' ? ' is-selected' : ''}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => onPick('local-codex')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') onPick('local-codex');
+          }}
+        >
+          <div className="plan-card-head">
+            <span className="plan-card-name">{t.plan.localName}</span>
+            <span className="tag tag-ok">{t.common.free}</span>
+          </div>
+          <div className="plan-card-summary">{t.plan.localSummary}</div>
+          <ul className="plan-card-bullets">
+            {t.plan.localBullets.map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+          <div className="plan-card-note">{t.plan.localNote}</div>
+          <div className="plan-card-foot">
+            <span className={plan === 'local-codex' ? 'tag tag-ok' : 'tag'}>
+              {plan === 'local-codex' ? t.plan.selected : t.plan.select}
+            </span>
+          </div>
+        </div>
+
+        <div
           className={`plan-card${plan === 'recommended' ? ' is-selected' : ''}`}
           role="button"
           tabIndex={0}
