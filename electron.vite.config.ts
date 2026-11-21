@@ -1,6 +1,8 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 import { existsSync, readdirSync, rmdirSync, unlinkSync } from 'fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'path';
 
 /**
@@ -37,7 +39,18 @@ const cleanRendererOut = {
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(), {
+      name: 'mac-tencent-audio',
+      writeBundle() {
+        if (process.platform !== 'darwin') return;
+        const dir = resolve(__dirname, 'out/native');
+        mkdirSync(dir, { recursive: true });
+        execFileSync('xcrun', ['clang', '-O2', '-fobjc-arc', '-mmacosx-version-min=14.2',
+          '-arch', 'arm64', '-arch', 'x86_64', resolve(__dirname, 'native/macos/tencent-audio.m'),
+          '-framework', 'AVFoundation', '-framework', 'CoreAudio', '-framework', 'Foundation',
+          '-framework', 'AudioToolbox', '-o', join(dir, 'tencent-audio')]);
+      },
+    }],
     resolve: { alias: { '@shared': resolve(__dirname, 'shared') } },
     build: {
       rollupOptions: {

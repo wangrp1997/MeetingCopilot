@@ -20,6 +20,8 @@ interface SelPopup {
 export function TranscriptPanel({
   segments,
   partials,
+  inputLevel,
+  terminalMode = false,
   answersReady,
   answersHint,
   onAsk,
@@ -29,6 +31,8 @@ export function TranscriptPanel({
   segments: TranscriptSegment[];
   partials?: { them?: string; me?: string };
   /** false = no LLM configured; transcription keeps working, ⚡答 does not */
+  inputLevel?: React.ReactNode;
+  terminalMode?: boolean;
   answersReady: boolean;
   answersHint: string;
   onAsk: (text: string) => void;
@@ -86,7 +90,7 @@ export function TranscriptPanel({
     <section className="pane pane-transcript">
       <header className="pane-head">
         <span className="pane-title">{t.transcript.title}</span>
-        <span className="pane-hint">{t.transcript.hint}</span>
+        <span className="pane-hint">{terminalMode ? t.transcript.classHint : t.transcript.hint}</span>
         <button className="btn btn-sm" onClick={() => {
           setSel(null);
           if (readTranscriptSelection(boxRef.current, window.getSelection())) window.getSelection()?.removeAllRanges();
@@ -95,6 +99,7 @@ export function TranscriptPanel({
           {t.transcript.clear}
         </button>
       </header>
+      {inputLevel}
       <div className="transcript" ref={boxRef} onScroll={onScroll} onMouseUp={captureSelection}>
         {segments.length === 0 ? (
           <div className="pane-empty">{t.transcript.empty}</div>
@@ -127,7 +132,8 @@ export function TranscriptPanel({
                 <div className="bubble-btns">
                   <button
                     className="bubble-ask"
-                    {...hintProps(t.transcript.translateTitle)}
+                    disabled={terminalMode && !answersReady}
+                    {...hintProps(terminalMode ? (answersReady ? t.transcript.classTranslate : answersHint) : t.transcript.translateTitle)}
                     onClick={(e) => {
                       e.stopPropagation();
                       onTranslate(s);

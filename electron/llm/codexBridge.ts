@@ -44,6 +44,7 @@ export interface CodexAnswerRequest {
   prompt: string;
   binary: string;
   workspace: string;
+  profileHome?: string;
   threadId?: string;
   model?: string;
   signal: AbortSignal;
@@ -125,7 +126,7 @@ export class CodexMeetingBridge {
 
   private async runAnswer(request: CodexAnswerRequest): Promise<CodexAnswerResult> {
     if (request.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-    await this.ensureStarted(request.binary, request.workspace);
+    await this.ensureStarted(request.binary, request.workspace, request.profileHome);
     const threadId = await this.ensureThread(request);
     if (request.signal.aborted) throw new DOMException('Aborted', 'AbortError');
 
@@ -176,14 +177,14 @@ export class CodexMeetingBridge {
     }
   }
 
-  private async ensureStarted(binary: string, workspace: string): Promise<void> {
+  private async ensureStarted(binary: string, workspace: string, profileHome?: string): Promise<void> {
     if (this.child && this.initialized) return;
     if (this.child) this.stop();
 
     const executable = binary.trim() || 'codex';
     const child = spawn(executable, ['app-server', '--listen', 'stdio://'], {
       cwd: workspace || process.cwd(),
-      env: process.env,
+      env: profileHome ? { ...process.env, CODEX_HOME: profileHome } : process.env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     this.child = child;

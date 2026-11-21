@@ -23,6 +23,7 @@ export interface TranscriptSegment {
 
 export interface AppendOptions {
   mergeWindowMs: number;
+  keepEverySegment?: boolean;
   maxMergedChars: number;
   maxSegments: number;
 }
@@ -32,6 +33,8 @@ export const DEFAULT_APPEND_OPTIONS: AppendOptions = {
   maxMergedChars: 600,
   maxSegments: 500,
 };
+
+export const CLASS_TRANSCRIPT_OPTIONS = { ...DEFAULT_APPEND_OPTIONS, keepEverySegment: true };
 
 const CJK_RE = /[぀-ヿ㐀-鿿豈-﫿]/;
 
@@ -59,6 +62,8 @@ export function appendSegment(
 ): TranscriptSegment[] {
   const text = seg.text.trim();
   if (!text) return [...list];
+
+  if (opts.keepEverySegment) return [...list, { ...seg, text }];
 
   const last = list[list.length - 1];
   // only merge fragments from the SAME speaker (dual-channel: 对方 vs 我);

@@ -18,7 +18,7 @@ import {
   session,
   shell,
 } from 'electron';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { release } from 'os';
 import { createRequire } from 'module';
 import { writeSmokeEvidence } from './smokeEvidence';
@@ -27,6 +27,7 @@ import {
   captureKindForPlatform,
   whisperExecutionProvidersForPlatform,
 } from '../shared/platform';
+import { registerTencentAudio } from './tencentAudio';
 import { AsrHost } from './asrHost';
 import { RagHost } from './ragHost';
 import type { RagStatus } from '../shared/rag';
@@ -49,6 +50,7 @@ import { KnowledgeStore } from './knowledge';
 import { SessionStore } from './sessions';
 import { DOC_EXTENSIONS, extractDocText } from './docparse';
 import { chatOnce, chatStream, type ChatResult } from './llm/adapter';
+import { CodexTerminalMeeting } from './llm/codexTerminal';
 import { CodexMeetingBridge } from './llm/codexBridge';
 import { visionChat } from './llm/vision';
 import {
@@ -138,6 +140,15 @@ function bootstrap(): void {
   let capturing = false;
   const asr = new AsrHost();
   const rag = new RagHost();
+  let classroom: CodexTerminalMeeting | undefined;
+  function codexProfileHome() {
+    const dir = join(app.getPath('userData'), 'codex-home');
+    return existsSync(join(dir, 'config.toml')) ? dir : undefined;
+  }
+  function stopClassroom() {
+    classroom?.stop();
+    classroom = undefined;
+  }
   const codexBridge = new CodexMeetingBridge();
   const sidecar = new FunasrSidecar();
   const tray = new AppTray();
@@ -551,6 +562,7 @@ function bootstrap(): void {
     });
 
     win.on('closed', () => {
+      stopClassroom();
       win = null;
     });
 
@@ -694,6 +706,7 @@ function bootstrap(): void {
     }
 
     // ---- IPC ----
+    registerTencentAudio(sender => sender === win?.webContents || sender === setupWin?.webContents);
     ipcMain.on(IPC.capturePcm, (_e, buf: ArrayBuffer, captureTs: number, channel: 'them' | 'me') => {
       asr.sendPcm(buf, captureTs, channel === 'me' ? 'me' : 'them');
     });
@@ -768,6 +781,9 @@ function bootstrap(): void {
           }
         }, 60_000);
       }
+    });
+    ipcMain.on(IPC.finishInputTest, event => {
+      if (event.sender === win?.webContents && !capturing) asr.flush('them');
     });
     ipcMain.on(IPC.captureStopped, () => {
       console.log('[main] capture stopped');
@@ -1107,6 +1123,39 @@ function bootstrap(): void {
       if (!win || win.isDestroyed() || win.webContents !== event.sender) throw new Error('Main window unavailable');
       return saveProtectionPreference(on, next => settings.applyPatch({ ui: { stealth: next } }), publicSettings);
     });
+    ipcMain.handle(IPC.codexPrepare, async event => {
+      const cfg = settings.data.codex;
+      if (event.sender !== win?.webContents || process.platform !== 'darwin' || !cfg?.enabled)
+        throw new Error('Codex classroom unavailable');
+      if (classroom) throw new Error('Codex classroom already open');
+      const profileHome = codexProfileHome();
+      const workspace = cfg.workspace?.trim() || (profileHome
+        ? join(app.getPath('userData'), '课堂资料') : app.getPath('home'));
+      if (profileHome && !cfg.workspace?.trim()) mkdirSync(workspace, { recursive: true });
+      const meeting = new CodexTerminalMeeting({
+        binary: cfg.binary?.trim() || 'codex', workspace,
+        profileHome, model: cfg.model, lang: settings.data.llm.answerLang ?? 'chinese',
+      }, error => {
+        if (classroom !== meeting) return;
+        classroom = undefined;
+        if (!event.sender.isDestroyed()) event.sender.send(IPC.codexClosed, error.message);
+      });
+      classroom = meeting;
+      try {
+        await meeting.prepare();
+      } catch (error) {
+        if (classroom === meeting) stopClassroom();
+        throw error;
+      }
+    });
+    ipcMain.on(IPC.codexStop, event => {
+      if (event.sender === win?.webContents) stopClassroom();
+    });
+    ipcMain.handle(IPC.codexSend, async (event, text: string) => {
+      if (event.sender !== win?.webContents || !classroom) throw new Error('Codex classroom unavailable');
+      if (typeof text !== 'string' || !text.trim()) throw new Error('Empty question');
+      await classroom.send(text);
+    });
     ipcMain.on(IPC.winHide, () => win?.hide());
     ipcMain.on(IPC.appQuit, () => app.quit());
 
@@ -1138,6 +1187,7 @@ function bootstrap(): void {
             }),
             binary: settings.data.codex?.binary ?? 'codex',
             workspace: settings.data.codex?.workspace?.trim() || app.getPath('home'),
+            profileHome: codexProfileHome(),
             threadId: settings.data.codex?.threadId,
             model: settings.data.codex?.model,
             signal: controller.signal,
@@ -1420,6 +1470,7 @@ function bootstrap(): void {
     ragEpoch += 1;
     for (const controller of llmControllers.values()) controller.abort();
     llmControllers.clear();
+    stopClassroom();
     codexBridge.stop();
     void rag.stop();
     void sidecar.stop();

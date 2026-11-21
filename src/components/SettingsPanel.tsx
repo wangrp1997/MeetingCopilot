@@ -1,3 +1,4 @@
+import { TENCENT_PLAYBACK } from '../meetingInputCapture';
 import { hintProps } from '../surfaceHints';
 import { useEffect, useRef, useState } from 'react';
 import type {
@@ -629,7 +630,7 @@ export function SettingsPanel({
       </div>
       {keyRow(t.settings.apiKey, llmKey, 'llm', llmTarget())}
       <div className="settings-section">{t.settings.codexSection}</div>
-      <div className="settings-hint">{t.settings.codexHint}</div>
+      <div className="settings-hint">{window.mc.platform === 'darwin' ? t.settings.codexClassHint : t.settings.codexHint}</div>
       <div className="settings-row">
         <label>{t.settings.codexEnabled}</label>
         <select
@@ -660,7 +661,7 @@ export function SettingsPanel({
               placeholder={t.settings.codexWorkspacePlaceholder}
             />
           </div>
-          <div className="settings-row">
+          {window.mc.platform !== 'darwin' && <div className="settings-row">
             <label>{t.settings.codexThreadId}</label>
             <input
               value={codexThreadId}
@@ -668,7 +669,7 @@ export function SettingsPanel({
               spellCheck={false}
               placeholder={t.settings.codexThreadPlaceholder}
             />
-          </div>
+          </div>}
           <div className="settings-row">
             <label>{t.settings.codexModel}</label>
             <input
@@ -678,11 +679,11 @@ export function SettingsPanel({
               placeholder={t.settings.codexModelPlaceholder}
             />
           </div>
-          <div className="settings-hint">
+          {window.mc.platform !== 'darwin' && <div className="settings-hint">
             {codexThreadId.trim()
               ? t.settings.codexResumeHint(codexThreadId.trim())
               : t.settings.codexNewThreadHint}
-          </div>
+          </div>}
         </>
       )}
       <div className="settings-row">
@@ -764,6 +765,7 @@ export function SettingsPanel({
       <div className="settings-row">
         <label>{t.settings.themDevice}</label>
         <select value={themDeviceId} onChange={(e) => setThemDeviceId(e.target.value)}>
+            {window.mc.platform === 'darwin' && <option value={TENCENT_PLAYBACK}>{t.titlebar.tencentPlayback}</option>}
           {deviceOptions}
         </select>
       </div>

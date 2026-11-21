@@ -1,3 +1,4 @@
+import { rmsOf } from '../../audio/level';
 /**
  * Step 4 连接测试 — the audio path, the real provider round-trips and a summary
  * checklist.
@@ -15,6 +16,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoopbackCapture } from '../../audio/loopbackCapture';
+import { MeetingInputCapture, TENCENT_PLAYBACK } from '../../meetingInputCapture';
 import { MicCapture, listMics } from '../../audio/micCapture';
 import { planDefinition, type KeySlot, type PlanSlot } from '../../../shared/onboardingPlans';
 import { storedKeyTest, targetFromPreset } from '../../../shared/providerTestRequests';
@@ -46,13 +48,7 @@ function levelBar(rms: number): number {
   return Math.min(1, Math.max(0, (db + 60) / 60));
 }
 
-function rmsOf(buf: ArrayBuffer): number {
-  const pcm = new Float32Array(buf);
-  if (pcm.length === 0) return 0;
-  let sum = 0;
-  for (let i = 0; i < pcm.length; i++) sum += pcm[i] * pcm[i];
-  return Math.sqrt(sum / pcm.length);
-}
+
 
 const NO_DEVICE_RE = /no audio track|NotFoundError|Requested device not found|NotAllowedError/i;
 
@@ -209,7 +205,12 @@ export function ConnectionStep({
     lastLoudRef.current = 0;
     try {
       if (isMac) {
-        const cap = new MicCapture();
+        const cap = new MeetingInputCapture(message => {
+          runningRef.current = false;
+          setRunning(false);
+          setState('failed');
+          setDetail(message);
+        }, window.mcSetup);
         // no echo cancellation / AGC: we want the raw level of the device
         await cap.start(themDeviceId || undefined, onPcm, { audioProcessing: false });
         captureRef.current = cap;
@@ -366,6 +367,7 @@ export function ConnectionStep({
               value={themDeviceId}
               onChange={(e) => onThemDeviceId(e.target.value)}
             >
+              <option value={TENCENT_PLAYBACK}>{t.connection.tencentPlayback}</option>
               <option value="">{t.connection.micDefault}</option>
               {devices.map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>

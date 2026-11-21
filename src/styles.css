@@ -1136,3 +1136,7 @@ textarea:focus-visible, summary:focus-visible {
   .btn { transition: none; }
   .cursor { animation: none; }
 }
+
+.input-level { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 4px 10px; color: var(--text-muted); font-size: 11px; }
+.input-level meter { width: 60px; height: 10px; }
+.input-reading { min-width: 50px; font-variant-numeric: tabular-nums; }

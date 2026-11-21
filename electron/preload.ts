@@ -41,8 +41,16 @@ export interface McApi {
   saveSessions(data: SessionsFile): void;
   setStealth(on: boolean): Promise<PublicSettings>;
   sendPcm(buf: ArrayBuffer, captureTs: number, channel: 'them' | 'me'): void;
+  codexPrepare(): Promise<void>;
+  codexStop(): void;
+  codexSend(text: string): Promise<void>;
+  onCodexClosed(cb: (error: string) => void): () => void;
+  startTencentAudio(id: string): Promise<void>;
+  stopTencentAudio(id: string): void;
+  onTencentAudio(id: string, cb: (chunk: ArrayBuffer | string) => void): () => void;
   captureStarted(): void;
   captureStopped(): void;
+  finishInputTest(): void;
   translate(text: string): Promise<string>;
   onAsrEvent(cb: (ev: AsrEvent) => void): () => void;
   /** pull the last ready/status events (call AFTER onAsrEvent subscription) */
@@ -116,8 +124,26 @@ const api: McApi = {
   saveSessions: (data) => ipcRenderer.send(IPC.sessionsSave, data),
   setStealth: (on) => ipcRenderer.invoke(IPC.stealthSet, on),
   sendPcm: (buf, captureTs, channel) => ipcRenderer.send(IPC.capturePcm, buf, captureTs, channel),
+  codexPrepare: () => ipcRenderer.invoke(IPC.codexPrepare),
+  codexStop: () => ipcRenderer.send(IPC.codexStop),
+  codexSend: text => ipcRenderer.invoke(IPC.codexSend, text),
+  onCodexClosed: cb => {
+    const listener = (_e: Electron.IpcRendererEvent, error: string) => cb(error);
+    ipcRenderer.on(IPC.codexClosed, listener);
+    return () => ipcRenderer.removeListener(IPC.codexClosed, listener);
+  },
+  startTencentAudio: id => ipcRenderer.invoke(IPC.tencentAudioStart, id),
+  stopTencentAudio: id => ipcRenderer.send(IPC.tencentAudioStop, id),
+  onTencentAudio: (id, cb) => {
+    const handle = (_event: Electron.IpcRendererEvent, owner: string, data: Uint8Array | string) => {
+      if (owner === id) cb(typeof data === 'string' ? data : Uint8Array.from(data).buffer);
+    };
+    ipcRenderer.on(IPC.tencentAudioData, handle);
+    return () => ipcRenderer.removeListener(IPC.tencentAudioData, handle);
+  },
   captureStarted: () => ipcRenderer.send(IPC.captureStarted),
   captureStopped: () => ipcRenderer.send(IPC.captureStopped),
+  finishInputTest: () => ipcRenderer.send(IPC.finishInputTest),
   translate: (text) => ipcRenderer.invoke(IPC.translateText, text),
   onAsrEvent: (cb) => {
     const listener = (_e: Electron.IpcRendererEvent, ev: AsrEvent) => cb(ev);

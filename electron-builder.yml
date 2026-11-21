@@ -13,6 +13,7 @@ directories:
 # 6.8 MB demo video plus GIFs.
 files:
   - out/**
+  - '!out/native/**'
   - package.json
   - '!src/**'
   - '!test/**'
@@ -105,4 +106,9 @@ portable:
 linux:
   executableName: meeting-copilot
 mac:
+  extraResources:
+    - from: out/native/tencent-audio
+      to: native/tencent-audio
+  extendInfo:
+    NSAudioCaptureUsageDescription: MeetingCopilot captures Tencent Meeting playback for live transcription.
   category: public.app-category.productivity

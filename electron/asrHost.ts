@@ -118,8 +118,8 @@ export class AsrHost {
     this.send({ type: 'config', language });
   }
 
-  flush(): void {
-    this.send({ type: 'flush' });
+  flush(channel?: 'them' | 'me'): void {
+    this.send({ type: 'flush', channel });
   }
 
   async stop(): Promise<void> {

@@ -20,6 +20,16 @@ export function isLikelyQuestion(text: string): boolean {
   return t.length >= 40;
 }
 
+// Classroom speech includes long explanations and self-narration. Require
+// an actual question or a request before sending a turn to the live terminal.
+export function isClassroomQuestion(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (/[?？]$/.test(t)) return true;
+  const clause = t.split(/[，,。；;！!]/).map(s => s.trim()).filter(Boolean).pop() ?? '';
+  return /(吗|么|呢)[。.]?$|为什么|为何|怎么办|怎么(样|做|选|写|用|算|解释)|如何|是什[么麼]|是什么|多少|哪(个|些|种|里)|能不能|可不可以|要不要|有没有|是否|请问|请(您|你)?(讲|说|解释|介绍|举)|^(what|why|how|which|when|where|can (you|we|I)|could you|should (we|I)|please explain)\b/i.test(clause);
+}
+
 // ---------- question-type hint (prompt v2) ----------
 
 export type QuestionKind = 'behavioral' | 'technical' | 'smalltalk' | 'other';

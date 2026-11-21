@@ -6,6 +6,8 @@ export class PcmCapture {
   private pending: Promise<void> | null = null;
   private generation = 0;
 
+  get deviceLabel(): string { return this.stream?.getAudioTracks()[0]?.label ?? ''; }
+
   get running(): boolean { return this.ctx !== null; }
 
   protected startStream(

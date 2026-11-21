@@ -559,11 +559,19 @@ export interface TrayCommandPayload {
 export const IPC = {
   /** renderer -> main, fire and forget: (ArrayBuffer pcmF32, captureTs, Speaker) */
   capturePcm: 'capture:pcm',
+  tencentAudioStart: 'tencent:audio-start',
+  tencentAudioStop: 'tencent:audio-stop',
+  tencentAudioData: 'tencent:audio-data',
   /** invoke: (text) => string — cheap one-shot translation to Chinese (inline, off-session) */
   translateText: 'llm:translate',
   /** renderer -> main: capture lifecycle */
+  codexPrepare: 'codex:prepare',
+  codexStop: 'codex:stop',
+  codexSend: 'codex:send',
+  codexClosed: 'codex:closed',
   captureStarted: 'capture:started',
   captureStopped: 'capture:stopped',
+  finishInputTest: 'capture:finish-input-test',
   /** main -> renderer: AsrEvent */
   asrEvent: 'asr:event',
   /** invoke: () => {ready, status} — pull the last ready/status AsrEvents.

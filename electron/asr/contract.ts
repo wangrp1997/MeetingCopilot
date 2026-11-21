@@ -35,6 +35,7 @@ export interface WorkerConfig {
 /** Force-close any open speech segment (capture stop / user request). */
 export interface WorkerFlush {
   type: 'flush';
+  channel?: 'them' | 'me';
 }
 
 export interface WorkerShutdown {

@@ -42,6 +42,9 @@ const CH = {
   clipboardReadText: 'app:clipboard-read',
   appGetInfo: 'app:get-info',
   providerTest: 'provider:test',
+  tencentAudioStart: 'tencent:audio-start',
+  tencentAudioStop: 'tencent:audio-stop',
+  tencentAudioData: 'tencent:audio-data',
 } as const satisfies Pick<
   typeof IPC,
   | 'onboardingGet'
@@ -53,9 +56,13 @@ const CH = {
   | 'clipboardReadText'
   | 'appGetInfo'
   | 'providerTest'
+  | 'tencentAudioStart' | 'tencentAudioStop' | 'tencentAudioData'
 >;
 
 export interface McSetupApi {
+  startTencentAudio(id: string): Promise<void>;
+  stopTencentAudio(id: string): void;
+  onTencentAudio(id: string, cb: (chunk: ArrayBuffer | string) => void): () => void;
   readonly platform: NodeJS.Platform;
   getOnboarding(): Promise<OnboardingState>;
   /** 保存并稍后继续: persist lastStep / selectedPlan without completing */
@@ -78,6 +85,16 @@ export interface McSetupApi {
 
 const api: McSetupApi = {
   platform: process.platform,
+  startTencentAudio: id => ipcRenderer.invoke(CH.tencentAudioStart, id),
+  stopTencentAudio: id => ipcRenderer.send(CH.tencentAudioStop, id),
+  onTencentAudio: (id, cb) => {
+    const handle = (_event: Electron.IpcRendererEvent, owner: string, data: Uint8Array | string) => {
+      if (owner === id) cb(typeof data === 'string' ? data : Uint8Array.from(data).buffer);
+    };
+    ipcRenderer.on(CH.tencentAudioData, handle);
+    return () => ipcRenderer.removeListener(CH.tencentAudioData, handle);
+  },
+
   getOnboarding: () => ipcRenderer.invoke(CH.onboardingGet),
   saveOnboardingProgress: (patch) => ipcRenderer.invoke(CH.onboardingSaveProgress, patch),
   completeOnboarding: (payload = {}) => ipcRenderer.invoke(CH.onboardingComplete, payload),

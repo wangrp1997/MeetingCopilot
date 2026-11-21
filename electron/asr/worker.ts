@@ -351,18 +351,16 @@ listen((msg: WorkerInMessage) => {
     case 'config':
       if (msg.language) language = msg.language;
       break;
-    case 'flush':
-      if (engine && isStreamingEngine(engine)) {
-        vads.them.flush();
-        vads.me.flush();
-        closeStream('them');
-        closeStream('me');
-        post({ type: 'status', state: 'listening', queuedSegments: 0 });
-      } else {
-        handleVadEvents(vads.them.flush(), 'them');
-        handleVadEvents(vads.me.flush(), 'me');
+    case 'flush': {
+      const channels: Channel[] = msg.channel ? [msg.channel] : ['them', 'me'];
+      for (const channel of channels) {
+        const events = vads[channel].flush();
+        if (engine && isStreamingEngine(engine)) closeStream(channel);
+        else handleVadEvents(events, channel);
       }
+      if (engine && isStreamingEngine(engine)) post({ type: 'status', state: 'listening', queuedSegments: 0 });
       break;
+    }
     case 'shutdown':
       shuttingDown = true;
       queue = [];

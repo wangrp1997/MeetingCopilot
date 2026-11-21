@@ -12,15 +12,19 @@ import type {
 } from '../shared/protocol';
 import {
   appendSegment,
+  CLASS_TRANSCRIPT_OPTIONS,
   nextSegmentId,
   percentile,
   reindexSegments,
   type TranscriptSegment,
 } from '../shared/transcript';
-import { isLikelyQuestion } from '../shared/textHeuristics';
+import { isClassroomQuestion, isLikelyQuestion } from '../shared/textHeuristics';
 import { captureKindForPlatform } from '../shared/platform';
 import { deriveServiceHealth } from '../shared/healthState';
 import { LoopbackCapture } from './audio/loopbackCapture';
+import { MeetingInputCapture, TENCENT_PLAYBACK } from './meetingInputCapture';
+import { InputLevel } from './components/InputLevel';
+import { rmsOf } from './audio/level';
 import { MicCapture, listMics } from './audio/micCapture';
 import { TranscriptPanel } from './components/TranscriptPanel';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -80,6 +84,14 @@ export function App() {
   const [protectionUnknown, setProtectionUnknown] = useState(true);
   const [asr, setAsr] = useState<AsrUiState>({ phase: 'loading', workerState: 'loading' });
   const [capturing, setCapturing] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [preparedEpoch, setPreparedEpoch] = useState<number | null>(null);
+  const [inClass, setInClass] = useState(false);
+  const classroom = useRef<'off' | 'preparing' | 'listening'>('off');
+  const captureEpoch = useRef(0);
+  const startingCapture = useRef(false);
+  const liveSince = useRef(Infinity);
+  const autoAnswer = useRef(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHealth, setShowHealth] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -87,7 +99,9 @@ export function App() {
   const [showHud, setShowHud] = useState(true);
   const [hud, setHud] = useState<HudStats>({ count: 0 });
   const [continuous, setContinuous] = useState(false);
+  autoAnswer.current = continuous;
   const [mics, setMics] = useState<{ deviceId: string; label: string }[]>([]);
+  const liveInput = useRef({ peak: 0, frames: 0 });
   const [micActive, setMicActive] = useState(false);
   const [partials, setPartials] = useState<{ them?: string; me?: string }>({});
   const [sessions, setSessions] = useState<StoredSession[]>([]);
@@ -98,7 +112,7 @@ export function App() {
   const [kbNotice, setKbNotice] = useState<string | null>(null);
 
   const loopbackRef = useRef<LoopbackCapture | null>(null);
-  const themInputRef = useRef<MicCapture | null>(null);
+  const themInputRef = useRef<MeetingInputCapture | null>(null);
   const micRef = useRef<MicCapture | null>(null);
   const settingsRef = useRef<PublicSettings | null>(null);
   const e2eSamples = useRef<number[]>([]);
@@ -114,7 +128,10 @@ export function App() {
   tRef.current = t;
 
   if (!loopbackRef.current) loopbackRef.current = new LoopbackCapture();
-  if (!themInputRef.current) themInputRef.current = new MicCapture();
+  if (!themInputRef.current) themInputRef.current = new MeetingInputCapture(message => {
+    void stopCapture();
+    setAsr(s => setError(s, 'capture', message));
+  });
   if (!micRef.current) micRef.current = new MicCapture();
   settingsRef.current = settings;
   sessionsRef.current = sessions;
@@ -199,10 +216,29 @@ export function App() {
     [patchSession],
   );
 
+  const forwardMeetingPcm = useCallback((buf: ArrayBuffer, ts: number) => {
+    liveInput.current.peak = Math.max(liveInput.current.peak, rmsOf(buf));
+    liveInput.current.frames++;
+    window.mc.sendPcm(buf, ts, 'them');
+  }, []);
   const askLlm = useCallback(
     (mode: 'segment' | 'continuous' | 'free' | 'translate', text?: string) => {
       const sid = currentIdRef.current;
       if (!sid) return;
+      if (classroom.current !== 'off') {
+        if (classroom.current === 'listening' && text?.trim()) {
+          const epoch = captureEpoch.current;
+          const language = answerLangRef.current === 'english' ? 'English' : '中文';
+          const translationLang = /[\u3400-\u9fff]/.test(text) ? '英文' : '中文';
+          const message = mode === 'translate'
+            ? `课堂翻译：把下面这句译成${translationLang}。只输出${translationLang}译文。\n${text}`
+            : mode === 'free' ? text : `课堂提问（${language}） ${text}`;
+          void window.mc.codexSend(message).catch((e: Error) => {
+            if (epoch === captureEpoch.current) setAsr(s => setError(s, 'capture', e.message));
+          });
+        }
+        return;
+      }
       const requestId = uid('req');
       const segs = sessionsRef.current.find((x) => x.id === sid)?.segments ?? [];
       // continuous: resolve the actual question NOW — the other party's latest
@@ -274,6 +310,7 @@ export function App() {
       setProtectionUnknown(typeof s.contentProtection?.actual !== 'boolean');
       setProtectionError(s.contentProtection?.ok !== true);
       answerLangRef.current = s.llm.answerLang;
+      void listMics().then(setMics).catch(() => undefined);
     }).catch(() => { setProtectionUnknown(true); setProtectionError(true); });
     void window.mc.loadSessions().then((f) => {
       if (f.sessions.length) {
@@ -302,6 +339,10 @@ export function App() {
         setPartials((p) => ({ ...p, [ev.speaker]: ev.text }));
       } else if (ev.kind === 'segment') {
         setPartials((p) => ({ ...p, [ev.speaker]: undefined })); // final replaces the live partial
+        if (classroom.current === 'listening' && ev.speaker === 'them'
+          && ev.timings.speechStartTs >= liveSince.current && autoAnswer.current && isClassroomQuestion(ev.text)) {
+          askLlm('continuous', ev.text);
+        }
         const e2eMs = Date.now() - ev.timings.speechEndTs;
         const inferMs = ev.timings.inferEndTs - ev.timings.inferStartTs;
         e2eSamples.current.push(e2eMs);
@@ -330,7 +371,8 @@ export function App() {
                     endTs: ev.timings.speechEndTs,
                     e2eMs,
                     inferMs,
-                  }),
+                  }, window.mc.platform === 'darwin' && settingsRef.current?.codex.enabled
+                    ? CLASS_TRANSCRIPT_OPTIONS : undefined),
                 }
               : s,
           ),
@@ -373,6 +415,11 @@ export function App() {
       }
     });
 
+    const offClassroom = window.mc.onCodexClosed((message) => {
+      if (classroom.current === 'off') return;
+      void stopCapture();
+      setAsr(s => setError(s, 'capture', message));
+    });
     const offShot = window.mc.onShotHotkey(() => void doRegionShot());
 
     window.__mcAutoStart = () => void startCapture();
@@ -384,6 +431,7 @@ export function App() {
       off();
       offLlm();
       offShot();
+      offClassroom();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -431,6 +479,7 @@ export function App() {
   // mic), question-gated + append, per current session.
   const lastSeg = segments.length ? segments[segments.length - 1] : null;
   useEffect(() => {
+    if (window.mc.platform === 'darwin' && settingsRef.current?.codex.enabled) return;
     if (!continuous || !lastSeg) return;
     if ((lastSeg.speaker ?? 'them') !== 'them') return; // ignore my own voice
     if (!isLikelyQuestion(lastSeg.text)) return;
@@ -439,34 +488,96 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [continuous, lastSeg?.id, lastSeg?.endTs]);
 
-  // Windows: Electron system loopback. macOS/Linux: selected ordinary input
-  // (typically a virtual audio device for meeting/system audio).
-  const startCapture = useCallback(async () => {
+  const failStart = useCallback((epoch: number, error: Error) => {
+    if (epoch !== captureEpoch.current) return;
+    if (classroom.current !== 'off') window.mc.codexStop();
+    classroom.current = 'off';
+    startingCapture.current = false;
+    setPreparedEpoch(null);
+    setPreparing(false);
+    setAsr(s => setError(s, 'capture', tRef.current.app.captureStartFail(error.message)));
+  }, []);
+
+  const acquireAudio = useCallback(async (epoch: number) => {
     const inputMode = captureKindForPlatform(window.mc.platform) === 'input';
-    const cap = inputMode ? themInputRef.current! : loopbackRef.current!;
-    if (cap.running) return;
+    const terminalMode = classroom.current === 'preparing';
     try {
+      const captureStartedAt = Date.now();
       if (inputMode) {
         await themInputRef.current!.start(
           settingsRef.current?.audio.themDeviceId,
-          (buf, ts) => window.mc.sendPcm(buf, ts, 'them'),
+          forwardMeetingPcm,
           { audioProcessing: false },
         );
         void listMics().then(setMics).catch(() => undefined);
       } else {
-        await loopbackRef.current!.start((buf, ts) => window.mc.sendPcm(buf, ts, 'them'));
+        await loopbackRef.current!.start(forwardMeetingPcm);
+      }
+      if (epoch !== captureEpoch.current) return;
+      if (terminalMode) {
+        classroom.current = 'listening';
+        liveSince.current = captureStartedAt;
+
+        setInClass(true);
       }
       window.mc.captureStarted();
       setCapturing(true);
       setAsr((s) => clearError(s, 'capture'));
       prewarm(true); // ▶ = the meeting starts — build the KV prefix cache now
     } catch (e) {
-      setAsr((s) => setError(s, 'capture', tRef.current.app.captureStartFail((e as Error).message)));
+      failStart(epoch, e as Error);
+    } finally {
+      if (epoch === captureEpoch.current) {
+        startingCapture.current = false;
+        setPreparing(false);
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [prewarm, failStart]);
+
+  // The terminal can accept the lesson background while local ASR warms up.
+  // Acquire audio only after both finish, irrespective of completion order.
+  useEffect(() => {
+    if (preparedEpoch === null || preparedEpoch !== captureEpoch.current || asr.phase === 'loading') return;
+    setPreparedEpoch(null);
+    if (asr.phase === 'error') {
+      failStart(preparedEpoch, new Error(asr.errors?.engine || tRef.current.status.engineError));
+    } else {
+      void acquireAudio(preparedEpoch);
+    }
+  }, [preparedEpoch, asr.phase, asr.errors?.engine, failStart, acquireAudio]);
+
+  const startCapture = useCallback(async () => {
+    if (!settingsRef.current || startingCapture.current || classroom.current !== 'off' ||
+      themInputRef.current?.running || loopbackRef.current?.running) return;
+    startingCapture.current = true;
+    const epoch = ++captureEpoch.current;
+    if (window.mc.platform !== 'darwin' || !settingsRef.current.codex.enabled) {
+      await acquireAudio(epoch);
+      return;
+    }
+    classroom.current = 'preparing';
+    setPreparing(true);
+    setAsr(s => clearError(s, 'capture'));
+    try {
+      await window.mc.codexPrepare();
+      if (epoch === captureEpoch.current) setPreparedEpoch(epoch);
+    } catch (e) {
+      failStart(epoch, e as Error);
+    }
+  }, [acquireAudio, failStart]);
 
   const stopCapture = useCallback(async () => {
+    ++captureEpoch.current;
+    setPreparedEpoch(null);
+    startingCapture.current = false;
+    if (classroom.current !== 'off') {
+      classroom.current = 'off';
+      liveSince.current = Infinity;
+      window.mc.codexStop();
+      setPreparing(false);
+      setInClass(false);
+      setContinuous(false);
+    }
     const cap =
       captureKindForPlatform(window.mc.platform) === 'input'
         ? themInputRef.current!
@@ -509,6 +620,10 @@ export function App() {
 
   const translateSegment = useCallback(
     (seg: TranscriptSegment) => {
+      if (classroom.current !== 'off') {
+        askLlm('translate', seg.text);
+        return;
+      }
       if (seg.translating) return; // re-translating an already-translated bubble is allowed
       const sid = currentIdRef.current;
       setSeg(sid, seg.id, { translating: true });
@@ -517,7 +632,7 @@ export function App() {
         .then((zh) => setSeg(sid, seg.id, { translation: zh, translating: false }))
         .catch(() => setSeg(sid, seg.id, { translation: tRef.current.app.translateFail, translating: false }));
     },
-    [setSeg],
+    [askLlm, setSeg],
   );
 
   const toggleStealth = useCallback(async () => {
@@ -581,13 +696,12 @@ export function App() {
       await input
         .start(
           deviceId || undefined,
-          (buf, ts) => window.mc.sendPcm(buf, ts, 'them'),
+          forwardMeetingPcm,
           { audioProcessing: false },
         )
         .then(() => setAsr((s) => clearError(s, 'capture')))
         .catch((e) => {
-          window.mc.captureStopped();
-          setCapturing(false);
+          void stopCapture();
           setAsr((s) => setError(s, 'capture', tRef.current.app.themInputSwitchFail((e as Error).message)));
         });
     }
@@ -663,12 +777,14 @@ export function App() {
    * gate included, so the two can never disagree. Re-subscribed whenever that
    * state changes — cheaper and less error-prone than a fistful of refs.
    */
+  const canStart = !!settings && (asr.phase === 'ready' ||
+    (window.mc.platform === 'darwin' && settings.codex.enabled));
   useEffect(() => {
     return window.mc.onTrayCommand(({ command }) => {
       switch (command) {
         case 'toggle-capture':
-          if (capturing) void stopCapture();
-          else if (asr.phase === 'ready') void startCapture();
+          if (capturing || preparing) void stopCapture();
+          else if (canStart) void startCapture();
           return;
         case 'new-session':
           createSession();
@@ -687,7 +803,7 @@ export function App() {
           return;
       }
     });
-  }, [capturing, asr.phase, startCapture, stopCapture, createSession, closePanels]);
+  }, [capturing, preparing, canStart, startCapture, stopCapture, createSession, closePanels]);
 
   const pickKb = useCallback(
     async (slot: KbSlot) => {
@@ -774,8 +890,8 @@ export function App() {
         <div className="titlebar-actions">
           <button
             className={capturing ? 'btn btn-live' : 'btn btn-primary'}
-            onClick={() => (capturing ? void stopCapture() : void startCapture())}
-            disabled={asr.phase !== 'ready'}
+            onClick={() => (capturing || preparing ? void stopCapture() : void startCapture())}
+            disabled={!capturing && !preparing && !canStart}
             {...hintProps(captureKindForPlatform(window.mc.platform) === 'loopback'
                 ? capturing
                   ? t.titlebar.stopTitle
@@ -784,9 +900,9 @@ export function App() {
                   ? t.titlebar.stopInputTitle
                   : t.titlebar.startInputTitle)}
           >
-            {capturing ? t.titlebar.stop : t.titlebar.start}
+            {preparing ? t.titlebar.cancelPrep : capturing ? t.titlebar.stop : t.titlebar.start}
           </button>
-          {captureKindForPlatform(window.mc.platform) === 'input' && mics.length > 0 && (
+          {captureKindForPlatform(window.mc.platform) === 'input' && !!settings && (
             <select
               className="mic-select"
               value={settings?.audio.themDeviceId ?? ''}
@@ -794,6 +910,7 @@ export function App() {
               {...hintProps(t.titlebar.themDeviceTitle)} aria-label={t.titlebar.themDeviceTitle}
             >
               <option value="">{t.titlebar.themDeviceDefault}</option>
+              {window.mc.platform === 'darwin' && <option value={TENCENT_PLAYBACK}>{t.titlebar.tencentPlayback}</option>}
               {mics.map((m) => (
                 <option key={m.deviceId} value={m.deviceId}>
                   {(m.label || t.titlebar.themDeviceDefault).slice(0, 14)}
@@ -857,6 +974,10 @@ export function App() {
         </div>
       </header>
       <div className="upgrade-banner protection-update" role="status">{t.titlebar.protectionUpdate}</div>
+      {settings?.codex.enabled && asr.errors?.capture &&
+        <div className="upgrade-banner" role="alert">{asr.errors.capture}</div>}
+      {preparing && <div className="upgrade-banner" role="status">{preparedEpoch !== null && asr.phase === 'loading' ? t.titlebar.classWaitingForAsr : t.titlebar.classPreparing}</div>}
+      {inClass && <div className="upgrade-banner" role="status">{t.titlebar.classLive}</div>}
       {protectionSaveError && <div className="upgrade-banner" role="alert">{t.titlebar.protectionSaveFailed}</div>}
       {protectionError && <div className="upgrade-banner" role="alert">{t.titlebar.protectionFailed}</div>}
 
@@ -949,8 +1070,14 @@ export function App() {
           key={currentId}
           segments={segments}
           partials={partials}
-          answersReady={answersReady}
-          answersHint={t.health.answersDisabled}
+          inputLevel={settings && captureKindForPlatform(window.mc.platform) === 'input' &&
+            <InputLevel capturing={capturing} asrReady={asr.phase === 'ready'} deviceId={settings.audio.themDeviceId}
+              deviceLabel={themInputRef.current?.deviceLabel || (settings.audio.themDeviceId === TENCENT_PLAYBACK
+                ? t.titlebar.tencentPlayback : mics.find(m => m.deviceId === settings.audio.themDeviceId)?.label) || ''}
+              live={liveInput} sentences={segments.filter(seg => seg.speaker !== 'me').length} />}
+          terminalMode={Boolean(settings?.codex.enabled && window.mc.platform === 'darwin')}
+          answersReady={answersReady && !preparing && (!(settings?.codex.enabled && window.mc.platform === 'darwin') || inClass)}
+          answersHint={settings?.codex.enabled && window.mc.platform === 'darwin' ? t.titlebar.classPrepareHint : t.health.answersDisabled}
           onAsk={(text) => askLlm('segment', text)}
           onTranslate={translateSegment}
           onClear={clearTranscript}

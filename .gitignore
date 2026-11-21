@@ -9,6 +9,12 @@ models/
 .vite/
 *.tsbuildinfo
 
+# Local macOS metadata and environment overrides
+.DS_Store
+.env
+.env.*
+!.env.example
+
 # local npm registry mirror config (China-specific; see README for setup tips)
 .npmrc
 

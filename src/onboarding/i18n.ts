@@ -190,8 +190,8 @@ const zh = {
       '完成上述检查后，点击「重新检测」。',
     ],
     macTitle: 'macOS 音频输入',
-    macHint:
-      'macOS 无法直接采集系统声音。请先安装 BlackHole 等虚拟音频设备，并在下面把它选为对方音频输入。',
+    tencentPlayback: '腾讯会议直采',
+    macHint: '打开腾讯会议后，可以直接采集它的播放声音（macOS 14.2 及以上），也可以选择 BlackHole 等虚拟输入。',
     macDevice: '对方音频输入',
     micTitle: '麦克风（可选）',
     micOff: '暂不启用',
@@ -446,8 +446,8 @@ const en: SetupDict = {
       'Then click "Check again".',
     ],
     macTitle: 'macOS audio input',
-    macHint:
-      'macOS cannot capture system audio directly. Install a virtual audio device such as BlackHole and select it below as the other-party input.',
+    tencentPlayback: 'Tencent Meeting audio',
+    macHint: 'Open Tencent Meeting to capture its playback on macOS 14.2 or later, or choose a virtual input such as BlackHole.',
     macDevice: 'Other-party audio input',
     micTitle: 'Microphone (optional)',
     micOff: 'Leave disabled',
